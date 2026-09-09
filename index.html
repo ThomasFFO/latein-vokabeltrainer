@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f7f9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vokabeltrainer">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Latein-Vokabeltrainer</title>
+<style>
+  :root{
+    --bg:#f6f7f9;--card:#fff;--text:#1d1d1f;--muted:#6e6e73;--line:#d2d2d7;
+    --accent:#0071e3;--good:#16803b;--bad:#c62828;--warn:#9a6700;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+    padding-bottom:env(safe-area-inset-bottom)
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top)) 16px 28px}
+  h1{font-size:30px;line-height:1.1;margin:0 0 18px}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:10}
+  .tab{border:1px solid var(--line);background:#fff;padding:11px 12px;border-radius:12px;cursor:pointer;font-size:15px}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .panel{display:none}
+  .panel.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+  .question{text-align:center}
+  .label{color:var(--muted);font-size:16px}
+  .latin{font-size:42px;font-weight:700;margin:16px 0 26px;word-break:break-word}
+  input{
+    width:100%;padding:15px 16px;font-size:18px;border:1px solid var(--line);
+    border-radius:12px;outline:none;background:#fff;color:var(--text)
+  }
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  button,.file-label{
+    border:0;border-radius:12px;padding:12px 16px;font-size:16px;cursor:pointer;
+    font-family:inherit;text-align:center
+  }
+  .primary{background:var(--accent);color:white}
+  .secondary{background:#e9e9ed;color:var(--text)}
+  .danger{background:#fde8e8;color:#9b1c1c}
+  .feedback{font-size:20px;font-weight:600;margin:20px 0 4px;min-height:28px}
+  .good{color:var(--good)} .bad{color:var(--bad)}
+  .stats{margin-top:16px;color:var(--muted);line-height:1.5}
+  .manage-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-bottom:18px}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff}
+  table{width:100%;border-collapse:collapse;min-width:680px}
+  th,td{padding:12px;border-bottom:1px solid var(--line);text-align:left}
+  th{font-size:14px;color:var(--muted);background:#fafafa;position:sticky;top:0}
+  tr.selected{background:#eef6ff}
+  .small{font-size:13px;color:var(--muted);line-height:1.45}
+  .footer-row{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .backup{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
+  .backup h2{font-size:18px;margin:0 0 10px}
+  .notice{margin:10px 0 0;color:var(--muted);font-size:13px}
+  #importFile{display:none}
+  @media(max-width:700px){
+    .wrap{padding-left:12px;padding-right:12px}
+    h1{font-size:26px}
+    .card{padding:18px}
+    .manage-grid{grid-template-columns:1fr}
+    .latin{font-size:34px}
+    .row > *{flex:1 1 auto}
+    .feedback{font-size:18px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Latein-Vokabeltrainer</h1>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="learn">Lernen</button>
+    <button class="tab" data-tab="manage">Vokabeln verwalten</button>
+  </div>
+
+  <section id="learn" class="panel active">
+    <div class="card question">
+      <div class="label">Welche Übersetzung gehört zu:</div>
+      <div id="latinQuestion" class="latin">Noch keine Vokabeln vorhanden.</div>
+      <input id="answerInput" placeholder="Deine Antwort …" autocomplete="off" autocapitalize="none" enterkeyhint="done">
+      <div class="row" style="justify-content:center;margin-top:14px">
+        <button id="checkBtn" class="primary">Antwort prüfen</button>
+        <button id="nextBtn" class="secondary">Nächste Vokabel</button>
+      </div>
+      <div id="feedback" class="feedback"></div>
+      <div id="stats" class="stats"></div>
+      <div class="small" style="margin-top:18px">
+        Mehrere richtige Übersetzungen kannst du mit Semikolon trennen, z. B. „lieben; gernhaben“.
+      </div>
+    </div>
+  </section>
+
+  <section id="manage" class="panel">
+    <div class="card">
+      <div class="manage-grid">
+        <input id="latinInput" placeholder="Lateinischer Begriff" autocapitalize="none">
+        <input id="germanInput" placeholder="Deutsche Übersetzung">
+        <button id="addBtn" class="primary">Hinzufügen</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Latein</th><th>Deutsch</th><th>Stufe</th><th>Richtig</th><th>Falsch</th></tr>
+          </thead>
+          <tbody id="vocabBody"></tbody>
+        </table>
+      </div>
+
+      <div class="footer-row">
+        <div class="row">
+          <button id="editBtn" class="secondary">Ausgewählte ändern</button>
+          <button id="deleteBtn" class="danger">Ausgewählte löschen</button>
+          <button id="resetBtn" class="secondary">Lernstand zurücksetzen</button>
+        </div>
+        <div id="count" class="small"></div>
+      </div>
+
+      <div class="backup">
+        <h2>Sicherung & Übertragung</h2>
+        <div class="row">
+          <button id="exportBtn" class="secondary">Daten exportieren</button>
+          <label for="importFile" class="file-label secondary">Daten importieren</label>
+          <input id="importFile" type="file" accept=".json,application/json">
+        </div>
+        <div class="notice">
+          Die Daten werden lokal auf diesem Gerät gespeichert. Mit Export/Import kannst du eine Sicherung erstellen oder den Bestand auf ein anderes Gerät übertragen.
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const STORAGE_KEY = "latein_vocab_trainer_v2";
+let data = loadData();
+let currentId = null;
+let previousId = null;
+let checked = false;
+let selectedId = null;
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return {version:2,vocabs:[]};
+    const parsed = JSON.parse(raw);
+    return parsed && Array.isArray(parsed.vocabs) ? parsed : {version:2,vocabs:[]};
+  }catch(e){ return {version:2,vocabs:[]}; }
+}
+function saveData(){
+  data.version = 2;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function normalize(s){
+  return (s||"").normalize("NFKC").trim().toLocaleLowerCase("de-DE").replace(/\s+/g," ");
+}
+function acceptedAnswers(s){
+  return s.split(";").map(normalize).filter(Boolean);
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+function chooseNext(){
+  const rows = data.vocabs;
+  if(!rows.length) return null;
+  let candidates = rows;
+  if(rows.length>1 && previousId){
+    const filtered = rows.filter(v=>v.id!==previousId);
+    if(filtered.length) candidates = filtered;
+  }
+  const weights = candidates.map(v=>{
+    let w = 1 + Math.pow(8-v.mastery,2);
+    w += Math.min(20, v.wrong * 1.5);
+    w /= 1 + Math.min(v.correct,20)*0.08;
+    return Math.max(.2,w);
+  });
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*total;
+  for(let i=0;i<candidates.length;i++){
+    r -= weights[i];
+    if(r<=0) return candidates[i];
+  }
+  return candidates[candidates.length-1];
+}
+
+function showNext(){
+  const v = chooseNext();
+  const q = document.getElementById("latinQuestion");
+  const f = document.getElementById("feedback");
+  const input = document.getElementById("answerInput");
+  f.textContent=""; f.className="feedback";
+  input.value="";
+  checked=false;
+
+  if(!v){
+    currentId=null;
+    q.textContent="Noch keine Vokabeln vorhanden.";
+    input.disabled=true;
+    f.textContent="Lege im Reiter „Vokabeln verwalten“ deine ersten Vokabeln an.";
+  }else{
+    currentId=v.id; previousId=v.id;
+    q.textContent=v.latin;
+    input.disabled=false;
+    setTimeout(()=>input.focus(),0);
+  }
+  updateStats();
+}
+
+function checkAnswer(){
+  if(!currentId || checked) return;
+  const input = document.getElementById("answerInput");
+  const answer = normalize(input.value);
+  const f = document.getElementById("feedback");
+  if(!answer){ f.textContent="Bitte zuerst eine Antwort eingeben."; return; }
+
+  const v = data.vocabs.find(x=>x.id===currentId);
+  const ok = acceptedAnswers(v.german).includes(answer);
+
+  if(ok){
+    v.mastery = Math.min(8, v.mastery + (v.streak>=2 ? 2 : 1));
+    v.streak += 1;
+    v.correct += 1;
+    f.textContent="✓ Richtig!";
+    f.className="feedback good";
+  }else{
+    v.mastery = Math.max(0, v.mastery-2);
+    v.streak = 0;
+    v.wrong += 1;
+    f.textContent="✗ Nicht ganz. Richtig wäre: " + v.german;
+    f.className="feedback bad";
+  }
+  v.lastSeen = new Date().toISOString();
+  checked=true;
+  saveData(); renderTable(); updateStats();
+}
+
+function addVocab(){
+  const l = document.getElementById("latinInput");
+  const g = document.getElementById("germanInput");
+  const latin=l.value.trim(), german=g.value.trim();
+  if(!latin || !german){ alert("Bitte Begriff und Übersetzung eingeben."); return; }
+  data.vocabs.push({id:uid(),latin,german,mastery:0,correct:0,wrong:0,streak:0,lastSeen:null});
+  saveData(); l.value=""; g.value=""; selectedId=null;
+  renderTable(); updateStats(); if(!currentId) showNext();
+}
+
+function renderTable(){
+  const body=document.getElementById("vocabBody");
+  body.innerHTML="";
+  [...data.vocabs].sort((a,b)=>a.latin.localeCompare(b.latin,"de")).forEach(v=>{
+    const tr=document.createElement("tr");
+    if(v.id===selectedId) tr.classList.add("selected");
+    tr.innerHTML=`<td>${esc(v.latin)}</td><td>${esc(v.german)}</td><td>${v.mastery}</td><td>${v.correct}</td><td>${v.wrong}</td>`;
+    tr.onclick=()=>{
+      selectedId=v.id;
+      document.getElementById("latinInput").value=v.latin;
+      document.getElementById("germanInput").value=v.german;
+      renderTable();
+    };
+    body.appendChild(tr);
+  });
+  document.getElementById("count").textContent=`${data.vocabs.length} Vokabel(n) gespeichert`;
+}
+function esc(s){
+  return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function editSelected(){
+  if(!selectedId){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+  const v=data.vocabs.find(x=>x.id===selectedId);
+  const latin=document.getElementById("latinInput").value.trim();
+  const german=document.getElementById("germanInput").value.trim();
+  if(!latin||!german){ alert("Bitte Begriff und Übersetzung eingeben."); return; }
+  v.latin=latin; v.german=german; saveData(); renderTable();
+  if(currentId===selectedId) document.getElementById("latinQuestion").textContent=latin;
+}
+function deleteSelected(){
+  if(!selectedId){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+  const v=data.vocabs.find(x=>x.id===selectedId);
+  if(!confirm(`„${v.latin} – ${v.german}“ wirklich löschen?`)) return;
+  data.vocabs=data.vocabs.filter(x=>x.id!==selectedId);
+  if(currentId===selectedId) currentId=null;
+  selectedId=null; saveData(); renderTable(); showNext();
+}
+function resetSelected(){
+  if(!selectedId){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+  const v=data.vocabs.find(x=>x.id===selectedId);
+  Object.assign(v,{mastery:0,correct:0,wrong:0,streak:0,lastSeen:null});
+  saveData(); renderTable(); updateStats();
+}
+function updateStats(){
+  const total=data.vocabs.length;
+  const correct=data.vocabs.reduce((s,v)=>s+v.correct,0);
+  const wrong=data.vocabs.reduce((s,v)=>s+v.wrong,0);
+  const mastered=data.vocabs.filter(v=>v.mastery>=6).length;
+  document.getElementById("stats").textContent = total ? `${total} Vokabeln · ${mastered} gut beherrscht · ${correct} richtige / ${wrong} falsche Antworten` : "";
+}
+
+function exportData(){
+  const payload = {
+    app: "Latein-Vokabeltrainer",
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    data
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const d = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `latein-vokabeln-${d}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+async function importData(file){
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const incoming = parsed?.data?.vocabs ? parsed.data : parsed;
+    if(!incoming || !Array.isArray(incoming.vocabs)) throw new Error("Ungültige Datei");
+    const ok = confirm(`Importieren? Dabei wird der aktuelle Bestand durch ${incoming.vocabs.length} Vokabel(n) ersetzt.`);
+    if(!ok) return;
+    data = {
+      version: 2,
+      vocabs: incoming.vocabs.map(v=>({
+        id: v.id || uid(),
+        latin: String(v.latin ?? "").trim(),
+        german: String(v.german ?? "").trim(),
+        mastery: Number.isFinite(v.mastery) ? v.mastery : 0,
+        correct: Number.isFinite(v.correct) ? v.correct : 0,
+        wrong: Number.isFinite(v.wrong) ? v.wrong : 0,
+        streak: Number.isFinite(v.streak) ? v.streak : 0,
+        lastSeen: v.lastSeen ?? null
+      })).filter(v=>v.latin && v.german)
+    };
+    selectedId=null; currentId=null; previousId=null; checked=false;
+    saveData(); renderTable(); showNext();
+    alert("Import abgeschlossen.");
+  }catch(e){
+    alert("Die Datei konnte nicht importiert werden.");
+  }
+}
+
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  };
+});
+document.getElementById("checkBtn").onclick=checkAnswer;
+document.getElementById("nextBtn").onclick=showNext;
+document.getElementById("addBtn").onclick=addVocab;
+document.getElementById("editBtn").onclick=editSelected;
+document.getElementById("deleteBtn").onclick=deleteSelected;
+document.getElementById("resetBtn").onclick=resetSelected;
+document.getElementById("exportBtn").onclick=exportData;
+document.getElementById("importFile").addEventListener("change",e=>{
+  const file=e.target.files?.[0];
+  if(file) importData(file);
+  e.target.value="";
+});
+document.getElementById("answerInput").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){ checked ? showNext() : checkAnswer(); }
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+}
+renderTable(); showNext();
+</script>
+</body>
+</html>
