@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Vokabelkasten">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Vokabelkasten</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--muted:#6e6e73;--line:#d2d2d7;--accent:#0071e3;--good:#16803b;--bad:#c62828}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,sans-serif}
+body{padding-bottom:env(safe-area-inset-bottom)}
+.wrap{max-width:920px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 14px 28px}
+h1{margin:0;font-size:30px}
+.top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.box-switch{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}
+button,input,select,.file-label{font:inherit;border-radius:12px;padding:12px 14px}
+button{border:0;cursor:pointer}
+input,select{border:1px solid var(--line);background:#fff;color:var(--text)}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,113,227,.12)}
+.primary{background:var(--accent);color:white}.secondary{background:#e9e9ed;color:var(--text)}.danger{background:#fde8e8;color:#9b1c1c}
+.tab{background:#fff;border:1px solid var(--line)}.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+.center{text-align:center}.muted{color:var(--muted)}.small{font-size:13px;color:var(--muted);line-height:1.45}
+.word{font-size:40px;font-weight:700;margin:16px 0 22px;word-break:break-word}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.row.center{justify-content:center}
+.answer-row{display:grid;grid-template-columns:1fr auto;gap:8px;max-width:680px;margin:0 auto}
+.answer-row input{width:100%;font-size:18px}
+.feedback{min-height:28px;margin-top:16px;font-size:19px;font-weight:600}.good{color:var(--good)}.bad{color:var(--bad)}
+.manage-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}.manage-grid input{width:100%}
+.table-wrap{overflow:auto;margin-top:14px;border:1px solid var(--line);border-radius:13px;background:#fff}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:10px;border-bottom:1px solid #e5e5e7;text-align:left}th{font-size:13px;color:var(--muted);background:#fafafa}tr.selected{background:#eef6ff}
+.section{border-top:1px solid var(--line);margin-top:20px;padding-top:18px}.section h2{font-size:18px;margin:0 0 10px}
+.box-create{display:grid;grid-template-columns:1fr auto;gap:8px;max-width:560px}.box-create input{width:100%}
+#fileImport{display:none}.file-label{display:inline-block;background:#e9e9ed;cursor:pointer}
+@media(max-width:650px){h1{font-size:26px}.top{align-items:flex-start}.box-switch{width:100%}.box-switch select{flex:1}.manage-grid,.box-create{grid-template-columns:1fr}.word{font-size:32px}.card{padding:17px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>Vokabelkasten</h1>
+    <div class="box-switch">
+      <select id="boxSelect" aria-label="Vokabelkasten auswählen"></select>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="learnPanel">Lernen</button>
+    <button class="tab" data-panel="managePanel">Verwalten</button>
+  </div>
+
+  <section id="learnPanel" class="panel active">
+    <div class="card center">
+      <div class="row center">
+        <span class="muted">Abfragerichtung:</span>
+        <select id="directionSelect">
+          <option value="fb">Fremdsprache → Deutsch</option>
+          <option value="bf">Deutsch → Fremdsprache</option>
+          <option value="mixed">Gemischt</option>
+        </select>
+      </div>
+
+      <div id="promptLabel" class="muted" style="margin-top:18px">Übersetze:</div>
+      <div id="questionWord" class="word">Noch keine Vokabeln vorhanden.</div>
+
+      <div class="answer-row">
+        <input id="answerInput" type="text" placeholder="Deine Antwort …" autocomplete="off" autocapitalize="none">
+        <button id="micButton" class="secondary" type="button">🎤</button>
+      </div>
+
+      <div class="row center" style="margin-top:12px">
+        <button id="checkButton" class="primary" type="button">Antwort prüfen</button>
+        <button id="nextButton" class="secondary" type="button">Nächste Vokabel</button>
+      </div>
+
+      <div id="feedback" class="feedback"></div>
+      <div id="stats" class="small"></div>
+      <div id="speechInfo" class="small" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section id="managePanel" class="panel">
+    <div class="card">
+      <div class="manage-grid">
+        <input id="frontInput" type="text" placeholder="Fremdsprache">
+        <input id="backInput" type="text" placeholder="Deutsch / Bedeutung">
+        <button id="addVocabButton" class="primary" type="button">Hinzufügen</button>
+      </div>
+      <p class="small">Mehrere richtige Antworten mit Semikolon trennen, z. B. „lieben; gernhaben“.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fremdsprache</th><th>Deutsch</th><th>→ Deutsch</th><th>→ Fremdsprache</th><th>R/F</th></tr></thead>
+          <tbody id="vocabTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="editVocabButton" class="secondary" type="button">Ausgewählte ändern</button>
+        <button id="deleteVocabButton" class="danger" type="button">Ausgewählte löschen</button>
+        <button id="resetVocabButton" class="secondary" type="button">Lernstand zurücksetzen</button>
+      </div>
+
+      <div class="section">
+        <h2>Neuen Vokabelkasten anlegen</h2>
+        <div class="box-create">
+          <input id="newBoxNameInput" type="text" placeholder="z. B. Englisch, Polnisch, Latein">
+          <button id="createBoxButton" class="primary" type="button">Kasten speichern</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Aktuellen Kasten verwalten</h2>
+        <div class="row">
+          <button id="renameBoxButton" class="secondary" type="button">Umbenennen</button>
+          <button id="deleteBoxButton" class="danger" type="button">Kasten löschen</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Sicherung & Übertragung</h2>
+        <div class="row">
+          <button id="exportCurrentButton" class="secondary" type="button">Diesen Kasten exportieren</button>
+          <button id="exportAllButton" class="secondary" type="button">Alle Kästen exportieren</button>
+          <label for="fileImport" class="file-label">Daten importieren</label>
+          <input id="fileImport" type="file" accept=".json,application/json">
+        </div>
+        <p class="small">Beim Import kannst du entscheiden, ob der Lernstand übernommen oder zurückgesetzt wird.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+const STORAGE_KEY = "vokabelkasten_v2_1";
+const OLD_V2_KEY = "vokabelkasten_v2";
+const OLD_V1_KEY = "latein_vocab_trainer_v2";
+
+let appState = loadState();
+let currentCardId = null;
+let previousCardId = null;
+let currentDirection = "fb";
+let answerWasChecked = false;
+let selectedCardId = null;
+
+const el = id => document.getElementById(id);
+
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+function blankProgress(){
+  return { mastery:0, correct:0, wrong:0, streak:0, lastSeen:null };
+}
+function makeCard(front, back){
+  return { id:uid(), front, back, progress:{ fb:blankProgress(), bf:blankProgress() } };
+}
+function makeDefaultState(){
+  const id = uid();
+  return { version:"2.1", activeBoxId:id, boxes:[{ id, name:"Mein Vokabelkasten", cards:[] }] };
+}
+function normalize(text){
+  return (text || "").normalize("NFKC").trim().toLocaleLowerCase("de-DE").replace(/\s+/g," ");
+}
+function accepted(text){
+  return String(text || "").split(";").map(normalize).filter(Boolean);
+}
+function ensureCard(card){
+  if(!card.progress) card.progress = {};
+  if(!card.progress.fb) card.progress.fb = blankProgress();
+  if(!card.progress.bf) card.progress.bf = blankProgress();
+}
+function migrateOldState(raw){
+  try{
+    const s = JSON.parse(raw);
+    if(Array.isArray(s.boxes)){
+      const converted = {
+        version:"2.1",
+        activeBoxId: s.activeBoxId || s.active || (s.boxes[0] && s.boxes[0].id),
+        boxes: s.boxes.map(b => ({
+          id: b.id || uid(),
+          name: String(b.name || "Vokabelkasten"),
+          cards: (b.cards || []).map(c => {
+            if("front" in c && "back" in c){
+              const n = { id:c.id || uid(), front:String(c.front), back:String(c.back), progress:c.progress || {fb:blankProgress(),bf:blankProgress()} };
+              ensureCard(n); return n;
+            }
+            if("f" in c && "b" in c){
+              const n = { id:c.id || uid(), front:String(c.f), back:String(c.b), progress:{fb:blankProgress(),bf:blankProgress()} };
+              if(c.p){
+                if(c.p.fb) n.progress.fb = {mastery:c.p.fb.m||0,correct:c.p.fb.c||0,wrong:c.p.fb.w||0,streak:c.p.fb.s||0,lastSeen:null};
+                if(c.p.bf) n.progress.bf = {mastery:c.p.bf.m||0,correct:c.p.bf.c||0,wrong:c.p.bf.w||0,streak:c.p.bf.s||0,lastSeen:null};
+              }
+              return n;
+            }
+            return null;
+          }).filter(Boolean)
+        }))
+      };
+      if(!converted.activeBoxId && converted.boxes[0]) converted.activeBoxId = converted.boxes[0].id;
+      return converted;
+    }
+  }catch(e){}
+  return null;
+}
+function loadState(){
+  for(const key of [STORAGE_KEY, OLD_V2_KEY]){
+    const raw = localStorage.getItem(key);
+    if(raw){
+      const migrated = migrateOldState(raw);
+      if(migrated) return migrated;
+    }
+  }
+  try{
+    const raw = localStorage.getItem(OLD_V1_KEY);
+    if(raw){
+      const old = JSON.parse(raw);
+      if(Array.isArray(old.vocabs) && old.vocabs.length){
+        const s = makeDefaultState();
+        s.boxes[0].name = "Latein";
+        s.boxes[0].cards = old.vocabs.map(v => {
+          const c = makeCard(String(v.latin||""), String(v.german||""));
+          c.progress.fb = {
+            mastery:v.mastery||0, correct:v.correct||0, wrong:v.wrong||0,
+            streak:v.streak||0, lastSeen:v.lastSeen||null
+          };
+          return c;
+        }).filter(c => c.front && c.back);
+        return s;
+      }
+    }
+  }catch(e){}
+  return makeDefaultState();
+}
+function saveState(){
+  appState.version = "2.1";
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+}
+function currentBox(){
+  return appState.boxes.find(b => b.id === appState.activeBoxId) || appState.boxes[0];
+}
+function currentCard(){
+  return currentBox().cards.find(c => c.id === currentCardId) || null;
+}
+function progressFor(card, dir){
+  ensureCard(card);
+  return dir === "bf" ? card.progress.bf : card.progress.fb;
+}
+function getDirectionForNext(){
+  const value = el("directionSelect").value;
+  return value === "mixed" ? (Math.random() < 0.5 ? "fb" : "bf") : value;
+}
+function chooseNextCard(){
+  const cards = currentBox().cards;
+  if(!cards.length) return null;
+
+  let candidates = cards;
+  if(cards.length > 1 && previousCardId){
+    const filtered = cards.filter(c => c.id !== previousCardId);
+    if(filtered.length) candidates = filtered;
+  }
+
+  const dir = getDirectionForNext();
+  const weights = candidates.map(card => {
+    const p = progressFor(card, dir);
+    let w = 1 + Math.pow(8 - p.mastery, 2);
+    w += Math.min(20, p.wrong * 1.5);
+    w /= 1 + Math.min(p.correct, 20) * 0.08;
+    return Math.max(0.2, w);
+  });
+
+  let r = Math.random() * weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<candidates.length;i++){
+    r -= weights[i];
+    if(r <= 0) return { card:candidates[i], dir };
+  }
+  return { card:candidates[candidates.length-1], dir };
+}
+function showNextCard(){
+  const next = chooseNextCard();
+  el("feedback").textContent = "";
+  el("feedback").className = "feedback";
+  el("answerInput").value = "";
+  answerWasChecked = false;
+
+  if(!next){
+    currentCardId = null;
+    el("questionWord").textContent = "Noch keine Vokabeln vorhanden.";
+    el("answerInput").disabled = true;
+    el("feedback").textContent = "Lege unter „Verwalten“ deine ersten Vokabeln an.";
+    updateStats();
+    return;
+  }
+
+  currentCardId = next.card.id;
+  previousCardId = next.card.id;
+  currentDirection = next.dir;
+  el("answerInput").disabled = false;
+  el("questionWord").textContent = currentDirection === "fb" ? next.card.front : next.card.back;
+  el("promptLabel").textContent = currentDirection === "fb" ? "Fremdsprache → Deutsch" : "Deutsch → Fremdsprache";
+  updateStats();
+  setTimeout(()=>el("answerInput").focus(), 0);
+}
+function checkAnswer(){
+  const card = currentCard();
+  if(!card || answerWasChecked) return;
+
+  const typed = normalize(el("answerInput").value);
+  if(!typed){
+    el("feedback").textContent = "Bitte zuerst eine Antwort eingeben.";
+    return;
+  }
+
+  const expected = currentDirection === "fb" ? card.back : card.front;
+  const isCorrect = accepted(expected).includes(typed);
+  const p = progressFor(card, currentDirection);
+
+  if(isCorrect){
+    p.mastery = Math.min(8, p.mastery + (p.streak >= 2 ? 2 : 1));
+    p.streak += 1;
+    p.correct += 1;
+    el("feedback").textContent = "✓ Richtig!";
+    el("feedback").className = "feedback good";
+  }else{
+    p.mastery = Math.max(0, p.mastery - 2);
+    p.streak = 0;
+    p.wrong += 1;
+    el("feedback").textContent = "✗ Richtig wäre: " + expected;
+    el("feedback").className = "feedback bad";
+  }
+  p.lastSeen = new Date().toISOString();
+  answerWasChecked = true;
+  saveState();
+  renderTable();
+  updateStats();
+}
+function updateStats(){
+  const cards = currentBox().cards;
+  if(!cards.length){
+    el("stats").textContent = "";
+    return;
+  }
+  const fb = cards.filter(c => progressFor(c,"fb").mastery >= 6).length;
+  const bf = cards.filter(c => progressFor(c,"bf").mastery >= 6).length;
+  el("stats").textContent = `${currentBox().name}: ${cards.length} Vokabeln · gut beherrscht: ${fb} → Deutsch / ${bf} → Fremdsprache`;
+}
+function renderBoxSelect(){
+  const select = el("boxSelect");
+  select.innerHTML = "";
+  appState.boxes.forEach(box => {
+    const option = document.createElement("option");
+    option.value = box.id;
+    option.textContent = box.name;
+    option.selected = box.id === appState.activeBoxId;
+    select.appendChild(option);
+  });
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function renderTable(){
+  const body = el("vocabTableBody");
+  body.innerHTML = "";
+  [...currentBox().cards].sort((a,b)=>a.front.localeCompare(b.front,"de")).forEach(card => {
+    ensureCard(card);
+    const tr = document.createElement("tr");
+    if(card.id === selectedCardId) tr.classList.add("selected");
+    tr.innerHTML = `<td>${escapeHtml(card.front)}</td><td>${escapeHtml(card.back)}</td><td>Stufe ${card.progress.fb.mastery}</td><td>Stufe ${card.progress.bf.mastery}</td><td>${card.progress.fb.correct+card.progress.bf.correct}/${card.progress.fb.wrong+card.progress.bf.wrong}</td>`;
+    tr.addEventListener("click", () => {
+      selectedCardId = card.id;
+      el("frontInput").value = card.front;
+      el("backInput").value = card.back;
+      renderTable();
+    });
+    body.appendChild(tr);
+  });
+}
+function addVocab(){
+  const front = el("frontInput").value.trim();
+  const back = el("backInput").value.trim();
+  if(!front || !back){
+    alert("Bitte Fremdsprache und Übersetzung ausfüllen.");
+    return;
+  }
+  currentBox().cards.push(makeCard(front, back));
+  el("frontInput").value = "";
+  el("backInput").value = "";
+  saveState();
+  renderTable();
+  updateStats();
+  if(!currentCardId) showNextCard();
+}
+function editVocab(){
+  const card = currentBox().cards.find(c => c.id === selectedCardId);
+  if(!card){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+
+  const front = el("frontInput").value.trim();
+  const back = el("backInput").value.trim();
+  if(!front || !back){ alert("Bitte beide Felder ausfüllen."); return; }
+
+  card.front = front;
+  card.back = back;
+  saveState();
+  renderTable();
+  if(card.id === currentCardId) showNextCard();
+}
+function deleteVocab(){
+  const card = currentBox().cards.find(c => c.id === selectedCardId);
+  if(!card){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+  if(!confirm(`„${card.front} – ${card.back}“ wirklich löschen?`)) return;
+
+  currentBox().cards = currentBox().cards.filter(c => c.id !== selectedCardId);
+  if(currentCardId === selectedCardId) currentCardId = null;
+  selectedCardId = null;
+  saveState();
+  renderTable();
+  showNextCard();
+}
+function resetVocab(){
+  const card = currentBox().cards.find(c => c.id === selectedCardId);
+  if(!card){ alert("Bitte zuerst eine Vokabel auswählen."); return; }
+  card.progress = { fb:blankProgress(), bf:blankProgress() };
+  saveState();
+  renderTable();
+  updateStats();
+}
+function createBox(){
+  const name = el("newBoxNameInput").value.trim();
+  if(!name){
+    alert("Bitte einen Namen für den neuen Vokabelkasten eingeben.");
+    return;
+  }
+  const newId = uid();
+  appState.boxes.push({ id:newId, name, cards:[] });
+  appState.activeBoxId = newId;
+  el("newBoxNameInput").value = "";
+  currentCardId = previousCardId = selectedCardId = null;
+  saveState();
+  renderAll();
+  showNextCard();
+}
+function renameBox(){
+  const box = currentBox();
+  const name = prompt("Neuer Name des Vokabelkastens:", box.name);
+  if(name && name.trim()){
+    box.name = name.trim();
+    saveState();
+    renderBoxSelect();
+    updateStats();
+  }
+}
+function deleteBox(){
+  if(appState.boxes.length === 1){
+    alert("Mindestens ein Vokabelkasten muss bestehen bleiben.");
+    return;
+  }
+  if(!confirm(`Vokabelkasten „${currentBox().name}“ mit allen Vokabeln löschen?`)) return;
+
+  appState.boxes = appState.boxes.filter(b => b.id !== appState.activeBoxId);
+  appState.activeBoxId = appState.boxes[0].id;
+  currentCardId = previousCardId = selectedCardId = null;
+  saveState();
+  renderAll();
+  showNextCard();
+}
+function exportData(allBoxes){
+  const payload = {
+    app:"Vokabelkasten",
+    version:"2.1",
+    exportedAt:new Date().toISOString(),
+    boxes: allBoxes ? appState.boxes : [currentBox()]
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = allBoxes ? "vokabelkasten-alle.json" : `vokabelkasten-${currentBox().name.replace(/[^\p{L}\p{N}]+/gu,"-").toLowerCase()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function importData(file){
+  try{
+    const payload = JSON.parse(await file.text());
+    if(!Array.isArray(payload.boxes)) throw new Error("Ungültig");
+
+    const keepProgress = confirm("Soll der Lernstand aus der Datei übernommen werden?\n\nOK = übernehmen\nAbbrechen = Lernstand zurücksetzen");
+    const replace = confirm("Sollen die importierten Kästen die vorhandenen ersetzen?\n\nOK = ersetzen\nAbbrechen = zusätzlich hinzufügen");
+
+    const imported = payload.boxes.map(box => ({
+      id:uid(),
+      name:String(box.name || "Importierter Kasten"),
+      cards:(box.cards || []).map(c => {
+        const n = makeCard(String(c.front ?? c.f ?? ""), String(c.back ?? c.b ?? ""));
+        if(keepProgress){
+          if(c.progress) n.progress = c.progress;
+          else if(c.p){
+            if(c.p.fb) n.progress.fb = {mastery:c.p.fb.m||0,correct:c.p.fb.c||0,wrong:c.p.fb.w||0,streak:c.p.fb.s||0,lastSeen:null};
+            if(c.p.bf) n.progress.bf = {mastery:c.p.bf.m||0,correct:c.p.bf.c||0,wrong:c.p.bf.w||0,streak:c.p.bf.s||0,lastSeen:null};
+          }
+        }
+        ensureCard(n);
+        return n;
+      }).filter(c => c.front && c.back)
+    }));
+
+    if(!imported.length) throw new Error("Leer");
+    appState.boxes = replace ? imported : appState.boxes.concat(imported);
+    appState.activeBoxId = imported[0].id;
+    currentCardId = previousCardId = selectedCardId = null;
+    saveState();
+    renderAll();
+    showNextCard();
+    alert("Import abgeschlossen.");
+  }catch(e){
+    alert("Die Datei konnte nicht importiert werden.");
+  }
+}
+function renderAll(){
+  renderBoxSelect();
+  renderTable();
+  updateStats();
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+    tab.classList.add("active");
+    el(tab.dataset.panel).classList.add("active");
+  });
+});
+
+el("boxSelect").addEventListener("change", e => {
+  appState.activeBoxId = e.target.value;
+  currentCardId = previousCardId = selectedCardId = null;
+  saveState();
+  renderTable();
+  showNextCard();
+});
+el("directionSelect").addEventListener("change", () => {
+  currentCardId = previousCardId = null;
+  showNextCard();
+});
+el("checkButton").addEventListener("click", checkAnswer);
+el("nextButton").addEventListener("click", showNextCard);
+el("answerInput").addEventListener("keydown", e => {
+  if(e.key === "Enter"){
+    answerWasChecked ? showNextCard() : checkAnswer();
+  }
+});
+
+el("addVocabButton").addEventListener("click", addVocab);
+el("editVocabButton").addEventListener("click", editVocab);
+el("deleteVocabButton").addEventListener("click", deleteVocab);
+el("resetVocabButton").addEventListener("click", resetVocab);
+
+el("createBoxButton").addEventListener("click", createBox);
+el("newBoxNameInput").addEventListener("keydown", e => {
+  if(e.key === "Enter") createBox();
+});
+el("renameBoxButton").addEventListener("click", renameBox);
+el("deleteBoxButton").addEventListener("click", deleteBox);
+
+el("exportCurrentButton").addEventListener("click", () => exportData(false));
+el("exportAllButton").addEventListener("click", () => exportData(true));
+el("fileImport").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0];
+  if(file) importData(file);
+  e.target.value = "";
+});
+
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(SpeechRecognitionAPI){
+  const recognition = new SpeechRecognitionAPI();
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  el("micButton").addEventListener("click", () => {
+    try{
+      recognition.lang = currentDirection === "fb" ? "de-DE" : (navigator.language || "de-DE");
+      recognition.start();
+      el("speechInfo").textContent = "Ich höre zu …";
+    }catch(e){}
+  });
+  recognition.addEventListener("result", e => {
+    el("answerInput").value = e.results[0][0].transcript;
+    el("speechInfo").textContent = "Sprache erkannt – du kannst die Antwort jetzt prüfen.";
+  });
+  recognition.addEventListener("error", () => {
+    el("speechInfo").textContent = "Direkte Spracherkennung war nicht verfügbar. Nutze alternativ das Diktier-Mikrofon der iPhone-Tastatur.";
+  });
+}else{
+  el("micButton").addEventListener("click", () => {
+    alert("Direkte Browser-Spracherkennung wird hier nicht unterstützt. Nutze bitte das Diktier-Mikrofon der iPhone-Tastatur.");
+  });
+  el("speechInfo").textContent = "Für Spracheingabe kannst du auf dem iPhone jederzeit das Diktier-Mikrofon der Tastatur verwenden.";
+}
+
+saveState();
+renderAll();
+showNextCard();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
